@@ -1,0 +1,304 @@
+---
+title: "Ch1 Names and values"
+output: 
+  html_document:
+    toc: true
+---
+
+<style type="text/css">
+  body{
+  font-size: 14pt;
+  font-family: Georgia;
+}
+</style>
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(collapse = TRUE)
+```
+
+## 2.1 Introduction
+
+```{r}
+pacman::p_load(lobstr)
+```
+
+
+## 2.2 Binding basics
+
+```{r}
+x <- c(1, 2, 3)
+y <- x
+obj_addr(x)
+obj_addr(y)
+```
+
+### 2.2.2 Q2
+
+```{r}
+obj_addr(mean)
+obj_addr(base::mean)
+obj_addr(get("mean"))
+obj_addr(evalq(mean))
+obj_addr(match.fun("mean"))
+```
+
+### 2.2.2 Q3
+The data frame structure in R is actually a special list, just the list of vectors, for example typeof(mtcar) = `r typeof(mtcars)`. So the columns of data frame equals to the elements of list. As we known, the elements of the list also need to take syntactic names. So if the column name of the csv file is non-syntactic, the function make.names() will apply transformation. To avoid this, set check.names = FALSE.
+
+```{r}
+non_syntactic <- read.csv(file = "non_syntactic.csv", header = T)
+non_syntactic |> colnames()
+```
+However, the initial name of the second column is **"4pit"**
+
+### 2.2.2 Q4
+
+Three main mechanisms ensure syntactically valid names (see ?make.names):  
+1. Names that do not start with a letter or a dot will be pre-pended with an "X"  
+2. Non-valid characters are replaced by a dot  
+3. Reserved R keywords (see ?reserved) are suffixed by a dot  
+```{r}
+make.names(" ")         # Rule 1
+make.names(".1")        # Rule 1
+make.names("4pit")      # Rule 1
+make.names("cat@home")  # Rule 2
+make.names("cat-home")  # Rule 2
+make.names("  cat")     # Rule 2
+make.names("while")     # Rule 3
+```
+
+### 2.2.2 Q5
+.123e1 is not a syntactic name, because it starts with one dot which is followed by a number.  
+So, this will make sense  
+```{r}
+make.names(".a123e1")
+```
+
+```{r echo=FALSE}
+rm(x, y, non_syntactic)
+```
+
+
+## 2.3 Copy-on-modify
+
+```{r}
+x <- c(1, 2, 3)
+tracemem(x) |> cat("\n")
+y <- x
+y[[3]] <- 4
+untracemem(y)
+```
+
+```{r}
+l1 <- list(1, 2, 3)
+l2 <- l1
+l2[[3]] <- 4
+ref(l1, l2)
+```
+
+```{r}
+d1 <- data.frame(x = c(1, 5, 6),
+                 y = c(2, 4, 3))
+d2 <- d1
+d2[, 2] <- d2[, 2] * 2
+ref(d1, d2)
+d3 <- d1
+d3[1, ] <- d3[1, ] * 2
+ref(d1, d3)
+```
+
+```{r echo=FALSE}
+rm(x, y, l1, l2, d1, d2, d3)
+```
+
+
+```{r}
+x <- c("a", "a", "abc", "d")
+y <- c("a", "c")
+ref(x, y, character = TRUE)
+rm(x, y)
+```
+
+### 2.3.6 Q2
+
+```{r}
+x <- c(1L, 2L, 3L)
+tracemem(x) |> cat("\n")
+cat("Change to 5L: \n")
+x[[3]] <- 5L
+cat("Change to 5: \n")
+x[[3]] <- 5
+untracemem(x)
+```
+
+### 2.3.6 Q3
+
+```{r}
+a <- 1:10
+b <- list(a, a)
+c <- list(b, a, 1:10)
+ref(c)
+```
+
+```{r echo=FALSE}
+rm(a, b, c, x)
+```
+
+### 2.3.6 Q4
+
+```{r}
+x <- list(1:10)
+ref(x)
+cat(tracemem(x), "\n")
+x[[2]] <- x
+untracemem(x)
+```
+
+
+## 2.4 Object size
+
+```{r}
+x <- runif(1e6)
+obj_size(x)
+y <- list(x, x, x)
+obj_size(y)
+object.size(y)
+```
+
+### 2.4.1 Q1
+
+```{r}
+y <- rep(list(runif(1e4)), 100)
+object.size(y)
+obj_size(y)
+obj_size(list(runif(1e4)))
+```
+
+### 2.4.1 Q2
+
+```{r}
+funs <- list(mean, sd, var)
+obj_size(funs)
+obj_size(mean)
+obj_size(sd) 
+obj_size(var)
+```
+
+### 2.4.1 Q3
+
+```{r}
+a <- runif(1e6)
+obj_size(a)           # 8 Mb
+
+b <- list(a, a)
+obj_size(b)           # 8 Mb
+obj_size(a, b)        # 8 Mb
+
+b[[1]][[1]] <- 10
+obj_size(b)           # 8 + 8 = 16 Mb
+obj_size(a, b)        # 16 Mb
+
+b[[2]][[1]] <- 10
+obj_size(b)           # 16 Mb
+obj_size(a, b)        # 16 + 8 = 24 Mb
+```
+
+
+```{r echo=FALSE}
+rm(x, y, a, b, funs)
+```
+
+## 2.5 Modify-in-place
+
+```{r}
+x <- data.frame(matrix(runif(5 * 1e6), ncol = 5))
+medians <- vapply(x, median, numeric(1))
+cat(tracemem(x), "\n")
+
+system.time(
+for (i in seq_along(medians)) {
+  x[[i]] <- x[[i]] - medians[[i]]
+})
+untracemem(x)
+```
+
+```{r}
+y <- as.list(x)
+cat(tracemem(y), "\n")
+
+system.time(
+for (i in 1:5) {
+  y[[i]] <- y[[i]] - medians[[i]]
+})
+untracemem(y)
+```
+
+```{r echo=FALSE}
+rm(x, y, i, medians)
+```
+
+### 2.5.3 Q1
+
+```{r}
+x <- list()
+obj_addr(x)
+tracemem(x)
+x[[1]] <- x
+obj_addr(x)
+obj_addr(x[[1]])
+```
+
+### 2.5.3 Q2
+
+```{r}
+create_random_df <- function(nrow, ncol) {
+  random_matrix <- matrix(runif(nrow * ncol), nrow = nrow)
+  as.data.frame(random_matrix)
+}
+subtract_df <- function(x, medians) {
+  for (i in seq_along(medians)) {
+    x[[i]] <- x[[i]] - medians[[i]]
+  }
+  x
+}
+subtract_list <- function(x, medians) {
+  x <- as.list(x)
+  x <- subtract_df(x, medians)
+  list2DF(x)
+}
+benchmark_medians <- function(ncol) {
+  df <- create_random_df(nrow = 1e4, ncol = ncol)
+  medians <- vapply(df, median, numeric(1), USE.NAMES = FALSE)
+
+  bench::mark(
+    "data frame" = subtract_df(df, medians),
+    "list" = subtract_list(df, medians),
+    time_unit = "ms"
+  )
+}
+
+```
+
+```{r}
+results <- bench::press(
+  ncol = c(1, 10, 100, 250, 500, 750, 1000, 2000),
+  benchmark_medians(ncol)
+)
+library(ggplot2)
+
+ggplot(
+  results,
+  aes(ncol, median, col = attr(expression, "description"))
+) +
+  geom_point(size = 2) +
+  geom_smooth() +
+  labs(
+    x = "Number of Columns",
+    y = "Execution Time (ms)",
+    colour = "Data Structure"
+  ) +
+  theme(legend.position = "top")
+```
+
