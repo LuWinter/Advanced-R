@@ -10,5 +10,8 @@ head(our_data)
 
 our_data %>% 
   group_by(cyl) %>% 
-  summarise(avg_mpg = mean(mpg)) %>% 
-  write.csv(file = "output/summary_mpg.csv", row.names = FALSE)
+  summarise(avg_mpg = mean(mpg))
+# mtcars %>% 
+  # group_by(cyl) %>%
+  # summarise(avg_mpg = mean(mpg))
+
